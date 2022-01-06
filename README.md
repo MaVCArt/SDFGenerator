@@ -25,5 +25,5 @@ output = SDFGenerator.generate_sdf(img, boolean_cutoff=0.5, spread=100, normaliz
 output.save('example_assets/output.png')
 ```
 
-![input](https://github.com/mavcart/sdfgenerator/blob/main/example_assets/input.png?raw=true)
-![output](https://github.com/mavcart/sdfgenerator/blob/main/example_assets/output.png?raw=true)
+<img src="https://github.com/mavcart/sdfgenerator/blob/main/example_assets/input.png?raw=true" height="50"/>
+<img src="https://github.com/mavcart/sdfgenerator/blob/main/example_assets/output.png?raw=true" height="50"/>
