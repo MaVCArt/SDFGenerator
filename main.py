@@ -27,6 +27,36 @@ from sdf_erosion import calculate_sdf
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+def generate_sdf_data(input_data, spread=25, normalize_distance=True):
+    """
+
+    :param input_data: input data, boolean field (0/1 float ndarray)
+    :type input_data: numpy.ndarray
+
+    :param spread: the number of pixels to "spread" the distance field.
+    :type spread: int
+
+    :param normalize_distance: if True, will calculate the distance field and _then_ normalize the output.
+    :type normalize_distance: bool
+
+    :return: numpy array
+    :rtype: numpy.ndarray
+    """
+    # -- this method returns a C "MemoryView" array, which numpy can understand and convert
+    result = calculate_sdf(
+        bool_field=input_data,
+        radius=spread,
+        normalize_distance=normalize_distance,
+    )
+    
+    # -- convert to numpy ndarray
+    result = np.asarray(result)
+
+    # -- return the result
+    return result
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 def generate_sdf(input_image, boolean_cutoff=0.5, spread=25, normalize_distance=True):
     """
     Given a black/white input image, generate a Signed Distance field as output, with the following
@@ -76,13 +106,7 @@ def generate_sdf(input_image, boolean_cutoff=0.5, spread=25, normalize_distance=
     data[data > boolean_cutoff] = 1.0
     data[data <= boolean_cutoff] = 0.0
 
-    # -- this method returns a C "MemoryView" array, which numpy can understand and convert
-    result = calculate_sdf(
-        bool_field=data,
-        radius=spread,
-        normalize_distance=normalize_distance,
-    )
-    result = np.asarray(result)
+    result = generate_sdf_data(data, spread, normalize_distance)
 
     # -- return a composed image
     return Image.fromarray(np.uint8(result * 255))
