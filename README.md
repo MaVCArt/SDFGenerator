@@ -9,8 +9,16 @@ on how to do this.
 This uses Cython to accelerate the SDF Calculation, and outputs a PIL Image object with four channels:
 
 - red / green channel: directional field indicating the UV space direction of the distance field
-- blue channel: unused
+- blue channel: bit mask indicating as white all pixels that were altered in the output data
 - alpha channel: traditional SDF (optionally normalized)
+
+# Requirements
+
+```
+- python 2.7.8+
+- numpy
+- cython
+```
 
 
 # Usage
@@ -26,10 +34,28 @@ output.save('example_assets/output.png')
 ```
 
 <table>
+<tr>
+    <td>Input data</td>
+    <td>Raw output data</td>
+    <td>Directional Data (RG)</td>
+    <td>Data bit mask</td>
+    <td>Traditional SDF</td>
+</tr>
+<tr>
 	<td>
 		<img src="https://github.com/mavcart/sdfgenerator/blob/main/example_assets/input.png?raw=true" height="100"/>
 	</td>
 	<td>
 		<img src="https://github.com/mavcart/sdfgenerator/blob/main/example_assets/output.png?raw=true" height="100"/>
 	</td>
+    <td>
+		<img src="https://github.com/mavcart/sdfgenerator/blob/main/example_assets/output_rgb.png?raw=true" height="100"/>
+	</td>
+    <td>
+		<img src="https://github.com/mavcart/sdfgenerator/blob/main/example_assets/output_blue.png?raw=true" height="100"/>
+	</td>
+    <td>
+		<img src="https://github.com/mavcart/sdfgenerator/blob/main/example_assets/output_alpha.png?raw=true" height="100"/>
+	</td>
+</tr>
 </table>

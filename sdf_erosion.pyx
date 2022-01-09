@@ -8,6 +8,7 @@ from cython.parallel import prange
 DTYPE = np.float64
 
 
+# -------------------------------------------------------------------------------------------------
 cpdef object shift(object arr, int num, object fill_value=np.nan):
     result = np.empty_like(arr)
     if num > 0:
@@ -21,12 +22,14 @@ cpdef object shift(object arr, int num, object fill_value=np.nan):
     return result
 
 
+# -------------------------------------------------------------------------------------------------
 cpdef object get_row_boundaries(object row):
     rising_diff = row - shift(row, 1, fill_value=0)
     decreasing_diff = row - shift(row, -1, fill_value=0)
     return np.maximum(rising_diff, decreasing_diff)
 
 
+# -------------------------------------------------------------------------------------------------
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
@@ -48,6 +51,7 @@ cpdef object get_boundaries(object data):
     return np.maximum(rows, columns)
 
 
+# -------------------------------------------------------------------------------------------------
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
