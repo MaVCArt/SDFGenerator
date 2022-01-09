@@ -2,7 +2,7 @@
 
 Simple SDF Generator using Python and Cython / numpy
 
-Note: the .pyd file(s) delivered with this project is compiled fo:
+Note: the .pyd file(s) delivered with this project is compiled for:
 
 - Python 2.7.8
 - Python 3.5.0
