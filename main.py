@@ -21,14 +21,136 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
+import random
 import numpy as np
 from PIL import Image
 from sdf_erosion import calculate_sdf
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+def flood_fill(shape_mask, id_mask, row, column, target_color):
+    shape_mask[row, column] = 0.0
+    id_mask[row, column] = target_color
+
+    offsets = [
+        [row - 1, column],
+        [row, column + 1],
+        [row + 1, column],
+        [row, column - 1],
+        [row - 1, column - 1],
+        [row + 1, column + 1],
+        [row - 1, column + 1],
+        [row + 1, column - 1],
+    ]
+
+    neighbours = list()
+
+    for _row, _column in offsets:
+        if _row < 0:
+            continue
+
+        if _row >= shape_mask.shape[0]:
+            continue
+
+        if _column < 0:
+            continue
+
+        if _column >= shape_mask.shape[1]:
+            continue
+
+        if shape_mask[_row, _column] == 0.0:
+            continue
+
+        if id_mask[_row, _column] == target_color:
+            continue
+
+        neighbours.append((_row, _column))
+
+    return neighbours
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def generate_image_id(input_image, boolean_cutoff=0.5):
+    """
+    Generate Image ID by flood filling all disconnected islands with a unique ID value.
+    This unique ID will simply be an integer that starts at 0 but increases by 1 for every island.
+    This raw data can then be turned into a full RGB image with unique colors per island,
+    or it can be channel packed if the user prefers a bit mask.
+
+    :param input_image: input data, boolean field (0/1 float ndarray)
+    :type input_image: numpy.ndarray
+
+    :param boolean_cutoff: cutoff value for the input image pre-process.
+    :type boolean_cutoff: float
+
+    :return: the generated data as an image with 4 channels
+    :rtype: PIL.Image
+    """
+    # -- filter the input image, converting it to greyscale and ensuring we have floating point values to work with.
+    shape_mask = np.asarray(input_image.convert('L')).astype(np.float64) / 255.0
+
+    # -- convert image to boolean field; the algorithm requires absolutes in order to work properly
+    shape_mask[shape_mask > boolean_cutoff] = 1.0
+    shape_mask[shape_mask <= boolean_cutoff] = 0.0
+
+    id_mask = np.zeros(shape_mask.shape, dtype=int)
+
+    remaining_pixels = shape_mask[shape_mask == 1.0]
+
+    target_value = random.randint(0, 255)
+
+    nr_islands = 0
+
+    last_remaining = len(remaining_pixels)
+
+    row, column = 0, -1
+    while len(remaining_pixels):
+        column += 1
+
+        if column >= shape_mask.shape[0]:
+            column = 0
+            row += 1
+
+        if row >= shape_mask.shape[1]:
+            break
+
+        # -- scanline approach, one line at a time.
+        if shape_mask[row, column] == 0.0:
+            continue
+
+        neighbours = flood_fill(shape_mask, id_mask, row, column, target_value)
+        while True:
+            new_neighbours = list()
+            for r, c in neighbours:
+                new_neighbours += flood_fill(shape_mask, id_mask, r, c, target_value)
+            new_neighbours = list(set(new_neighbours))
+            if not new_neighbours:
+                break
+            neighbours = new_neighbours
+            if len(neighbours) > (shape_mask.shape[0] * shape_mask.shape[1]):
+                print('Something\'s gone terribly wrong - we have more neighbours than pixels!')
+                break
+
+        target_value = random.randint(0, 255)
+        nr_islands += 1
+
+        remaining_pixels = shape_mask[shape_mask == 1.0]
+
+        if len(remaining_pixels) == last_remaining:
+            print('Infinite loop encountered!')
+            break
+
+        last_remaining = len(remaining_pixels)
+
+    print('%s islands!' % nr_islands)
+
+    return Image.fromarray(np.asarray(id_mask * 255))
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 def generate_sdf_data(input_data, spread=25, normalize_distance=True):
     """
+    Generate raw SDF Data as a numpy array.
 
     :param input_data: input data, boolean field (0/1 float ndarray)
     :type input_data: numpy.ndarray
