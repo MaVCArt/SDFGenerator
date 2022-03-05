@@ -2,20 +2,27 @@
 
 Simple SDF Generator using Python and Cython / numpy
 
-Note: the .pyd file(s) delivered with this project is compiled for:
-
-- Python 2.7.8
-- Python 3.5.0
+Note: you will have to compile your own .pyd file if you wish to use this module. 
+Setup.py is supplied, and this cython should compile on python 2.7.8 and 3.5.0, on which it was tested.
 
 If you wish to use it for another version,
 you will have to compile it using setup.py for your own python version. Please consult the official Cython website
 on how to do this.
 
-This uses Cython to accelerate the SDF Calculation, and outputs a PIL Image object with four channels:
+This uses Cython to accelerate the SDF Calculation, and outputs three PIL Images:
+
+The first, an RGBA image:
 
 - red / green channel: directional field indicating the UV space direction of the distance field
 - blue channel: bit mask indicating as white all pixels that were altered in the output data
 - alpha channel: traditional SDF (optionally normalized)
+
+The second, an RGB image, with a generated color ID for the SDF, where each island in the original image
+is assigned a random color. This information is then used during the SDF calculation to assign newly calculated
+pixels the ID of the nearest white pixel they matched.
+
+The final, an RGB image, is a LUT of the color ID. Using these two images combined with the first, some very interesting
+shader effects can be achieved.
 
 # Requirements
 
