@@ -171,12 +171,15 @@ def generate_image_id(input_image, use_id_array=False, id_array=None, boolean_cu
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def generate_sdf_data(input_data, spread=25, normalize_distance=True):
+def generate_sdf_data(input_data, id_data=None, spread=25, normalize_distance=True):
     """
     Generate raw SDF Data as a numpy array.
 
     :param input_data: input data, boolean field (0/1 float ndarray)
     :type input_data: numpy.ndarray
+
+    :param id_data: input ID, which allows us to spit out an SDF'd image ID which can then be used for animation.
+    :type id_data: numpy.ndarray
 
     :param spread: the number of pixels to "spread" the distance field.
     :type spread: int
@@ -188,17 +191,19 @@ def generate_sdf_data(input_data, spread=25, normalize_distance=True):
     :rtype: numpy.ndarray
     """
     # -- this method returns a C "MemoryView" array, which numpy can understand and convert
-    result = calculate_sdf(
+    result, id_map = calculate_sdf(
         bool_field=input_data,
+        id_map=id_data,
         radius=spread,
         normalize_distance=normalize_distance,
     )
     
     # -- convert to numpy ndarray
     result = np.asarray(result)
+    id_map = np.asarray(id_map)
 
     # -- return the result
-    return result
+    return result, id_map
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -250,8 +255,13 @@ def generate_sdf(input_image, boolean_cutoff=0.5, spread=25, normalize_distance=
     # -- convert image to boolean field; the algorithm requires absolutes in order to work properly
     data[data > boolean_cutoff] = 1.0
     data[data <= boolean_cutoff] = 0.0
+    
+    # -- generate an image ID and LUT
+    id_data, lut = generate_image_id(input_image, boolean_cutoff=boolean_cutoff)
+    id_data = np.asarray(id_data, dtype=int)
 
-    result = generate_sdf_data(data, spread, normalize_distance)
+    # -- generate the result data
+    result, id_map = generate_sdf_data(data, id_data, spread, normalize_distance)
 
     # -- return a composed image
-    return Image.fromarray(np.uint8(result * 255))
+    return Image.fromarray(np.uint8(result * 255)), Image.fromarray(np.uint8(id_map)), lut

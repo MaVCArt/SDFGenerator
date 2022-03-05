@@ -56,8 +56,9 @@ cpdef object get_boundaries(object data):
 @cython.wraparound(False)
 @cython.cdivision(True)
 @cython.nonecheck(False)
-cpdef double[:, :, :] calculate_sdf(
+cpdef tuple calculate_sdf(
         object bool_field,
+        object id_map,
         int radius=25,
         bint normalize_distance=True,
 ):
@@ -66,6 +67,9 @@ cpdef double[:, :, :] calculate_sdf(
 
     # -- get boundary field, this gives us the pixels we want to erode.
     cdef object boundary_field = get_boundaries(bool_field).astype(float)
+
+    if id_map.shape[:2] != bool_field.shape:
+        raise ValueError('id map shape must match bool field shape: %s / %s' % (id_map.shape[:2], bool_field.shape))
 
     # -- get all pixels to erode
     cdef double[:, :] bool_field_arr = bool_field.astype(float)
@@ -88,6 +92,25 @@ cpdef double[:, :, :] calculate_sdf(
         dtype=DTYPE
     )
 
+    cdef int[:, :, :] id_map_result = np.full(
+        (bool_field.shape[0], bool_field.shape[1], 3),
+        0,
+        dtype=int
+    )
+
+    cdef int[:, :, :] id_map_original = np.full(
+            (bool_field.shape[0], bool_field.shape[1], 3),
+            0,
+            dtype=int
+    )
+
+    # -- transfer id map to id map result so we can thread it
+    for c in range(id_map_original.shape[0]):
+        for r in range(id_map_original.shape[1]):
+            id_map_original[c, r, 0] = id_map[c, r, 0]
+            id_map_original[c, r, 1] = id_map[c, r, 1]
+            id_map_original[c, r, 2] = id_map[c, r, 2]
+
     # -- float converts to double implicitly in C
     cdef double max_size = <float> radius
 
@@ -103,6 +126,10 @@ cpdef double[:, :, :] calculate_sdf(
     cdef int i, x, y, column, row
     cdef int min_x, max_x, min_y, max_y = 0
 
+    # -- this is what makes this so fast; the "prange" method means it runs in parallel on as many threads
+    # -- as cython can use.
+    # -- "nogil" makes this even faster, as it ensures all code in this statement is run in pure C.
+    # -- the gotcha however is that no python object interactions can happen inside the loop.
     for i in prange(coord_range, nogil=True, schedule='static'):
         column, row = coords[i][0], coords[i][1]
 
@@ -135,8 +162,19 @@ cpdef double[:, :, :] calculate_sdf(
                 # -- normalize the vector before storing it
                 result[x, y][0] = (x - column) / vector_length
                 result[x, y][1] = (y - row) / vector_length
+
+                # -- the SDF mask is stored in the blue channel
                 result[x, y][2] = 1.0
+
+                # -- the distance value is stored in the alpha channel
                 result[x, y][3] = new_value
+
+                # -- track which ID we matched as closest
+                # -- we assign individual channels because otherwise we engage the GIL or python, which slows
+                # -- things down A LOT
+                id_map_result[x, y, 0] = id_map_original[column, row, 0]
+                id_map_result[x, y, 1] = id_map_original[column, row, 1]
+                id_map_result[x, y, 2] = id_map_original[column, row, 2]
 
     # -- bucket values for min/max remapping of the alpha channel
     # -- these are safe, as we know values do not exceed the 0-1 range at this stage
@@ -174,7 +212,7 @@ cpdef double[:, :, :] calculate_sdf(
 
     # -- if the user does not want to normalize the distance field, return here.
     if not normalize_distance:
-        return result
+        return result, id_map_result
 
     if max_value == min_value:
         raise ZeroDivisionError('if max and min are identical, this results in a zero division!')
@@ -188,4 +226,4 @@ cpdef double[:, :, :] calculate_sdf(
         for y in range(height):
             result[x, y][3] = (result[x, y][3] - min_value) / (max_value - min_value)
 
-    return result
+    return result, id_map_result
