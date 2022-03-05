@@ -61,8 +61,8 @@ def flood_fill(shape_mask, id_mask, row, column, target_color):
         if shape_mask[_row, _column] == 0.0:
             continue
 
-        if id_mask[_row, _column] == target_color:
-            continue
+        # if id_mask[_row, _column] == target_color:
+        #     continue
 
         neighbours.append((_row, _column))
 
@@ -70,20 +70,27 @@ def flood_fill(shape_mask, id_mask, row, column, target_color):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def generate_image_id(input_image, boolean_cutoff=0.5):
+def generate_image_id(input_image, use_id_array=False, id_array=None, boolean_cutoff=0.5):
     """
     Generate Image ID by flood filling all disconnected islands with a unique ID value.
     This unique ID will simply be an integer that starts at 0 but increases by 1 for every island.
     This raw data can then be turned into a full RGB image with unique colors per island,
     or it can be channel packed if the user prefers a bit mask.
 
-    :param input_image: input data, boolean field (0/1 float ndarray)
-    :type input_image: numpy.ndarray
+    :param input_image: RGB input image (must be a PIL Image)
+    :type input_image: PIL.Image
+
+    :param id_array: iterable of IDs to use for the IDs used in the output.
+    :type id_array: list | np.array
+
+    :param use_id_array:
+    :type use_id_array: bool
 
     :param boolean_cutoff: cutoff value for the input image pre-process.
     :type boolean_cutoff: float
 
-    :return: the generated data as an image with 4 channels
+    :return: the generated data as an image with 3 channels. Colors will be assigned randomly or using the provided
+        ID array.
     :rtype: PIL.Image
     """
     # -- filter the input image, converting it to greyscale and ensuring we have floating point values to work with.
@@ -93,11 +100,17 @@ def generate_image_id(input_image, boolean_cutoff=0.5):
     shape_mask[shape_mask > boolean_cutoff] = 1.0
     shape_mask[shape_mask <= boolean_cutoff] = 0.0
 
-    id_mask = np.zeros(shape_mask.shape, dtype=int)
+    id_mask = np.zeros((shape_mask.shape[0], shape_mask.shape[1], 3), dtype=int)
 
     remaining_pixels = shape_mask[shape_mask == 1.0]
 
-    target_value = random.randint(0, 255)
+    target_value = np.asarray([random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)])
+    target_value_index = 0
+    if use_id_array:
+        target_value = id_array[target_value_index]
+
+    ids = list()
+    ids.append(target_value)
 
     nr_islands = 0
 
@@ -131,7 +144,15 @@ def generate_image_id(input_image, boolean_cutoff=0.5):
                 print('Something\'s gone terribly wrong - we have more neighbours than pixels!')
                 break
 
-        target_value = random.randint(0, 255)
+        target_value = np.asarray([random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)])
+        if use_id_array:
+            target_value_index += 1
+            if target_value_index >= len(id_array):
+                raise ValueError('More islands in image than IDs provided!')
+            target_value = id_array[target_value_index]
+
+        ids.append(target_value)
+
         nr_islands += 1
 
         remaining_pixels = shape_mask[shape_mask == 1.0]
@@ -142,9 +163,11 @@ def generate_image_id(input_image, boolean_cutoff=0.5):
 
         last_remaining = len(remaining_pixels)
 
-    print('%s islands!' % nr_islands)
+    # -- compose a LUT for the generated IDs
+    id_lut = np.asarray([ids])
+    id_img = Image.fromarray(np.uint8(id_lut * 255))
 
-    return Image.fromarray(np.asarray(id_mask * 255))
+    return Image.fromarray(np.uint8(id_mask * 255)), id_img
 
 
 # ----------------------------------------------------------------------------------------------------------------------
