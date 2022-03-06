@@ -8,6 +8,9 @@ resize_output = (256, 256)
 
 output, coord_map = SDFGenerator.generate_sdf(img, boolean_cutoff=0.5, spread=50, normalize_distance=True)
 
+coord_map = SDFGenerator.utils.np_arr_to_img(coord_map / 1024.0)
+coord_map.show()
+
 output = SDFGenerator.utils.np_arr_to_img(output)
 
 output.resize(resize_output).save('example_assets/output.png')

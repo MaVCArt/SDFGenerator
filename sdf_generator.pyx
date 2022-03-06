@@ -90,9 +90,10 @@ cpdef tuple calculate_sdf(
 
     # -- the second output is a coordinate map; for each pixel in the SDF, it stores the coordinate of its paired
     # -- boundary pixel. This information can then be used to generate further images, such as an ID map, or others.
+    # -- we pre-fill this with a value of -1 so we can recognize pixels outside the chosen spread.
     cdef int[:, :, :] coord_map = np.full(
         (bool_field.shape[0], bool_field.shape[1], 2),
-        0,
+        -1,
         dtype=int
     )
 
@@ -108,8 +109,16 @@ cpdef tuple calculate_sdf(
     cdef int coord_range = len(coords)
 
     # -- allocating iterator variables
-    cdef int i, x, y, column, row
+    cdef int i, x, y, column, row, c, r
     cdef int min_x, max_x, min_y, max_y = 0
+
+    # -- pre-fill coord map with the boolean field pixels as they refer to themselves
+    for c in prange(width, nogil=True, schedule='static'):
+        for r in range(height):
+            if not bool_field_arr[c, r]:
+                continue
+            coord_map[c, r, 0] = c
+            coord_map[c, r, 1] = r
 
     # -- this is what makes this so fast; the "prange" method means it runs in parallel on as many threads
     # -- as cython can use.
