@@ -23,50 +23,13 @@ SOFTWARE.
 """
 import random
 import numpy as np
-from PIL import Image
+from . import utils
 from sdf_erosion import calculate_sdf
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def flood_fill(shape_mask, id_mask, row, column, target_color):
-    shape_mask[row, column] = 0.0
-    id_mask[row, column] = target_color
-
-    offsets = [
-        [row - 1, column],
-        [row, column + 1],
-        [row + 1, column],
-        [row, column - 1],
-        [row - 1, column - 1],
-        [row + 1, column + 1],
-        [row - 1, column + 1],
-        [row + 1, column - 1],
-    ]
-
-    neighbours = list()
-
-    for _row, _column in offsets:
-        if _row < 0:
-            continue
-
-        if _row >= shape_mask.shape[0]:
-            continue
-
-        if _column < 0:
-            continue
-
-        if _column >= shape_mask.shape[1]:
-            continue
-
-        if shape_mask[_row, _column] == 0.0:
-            continue
-
-        # if id_mask[_row, _column] == target_color:
-        #     continue
-
-        neighbours.append((_row, _column))
-
-    return neighbours
+def generate_progression_gradient(sdf, id_map, coord_map):
+    pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -131,18 +94,8 @@ def generate_image_id(input_image, use_id_array=False, id_array=None, boolean_cu
         if shape_mask[row, column] == 0.0:
             continue
 
-        neighbours = flood_fill(shape_mask, id_mask, row, column, target_value)
-        while True:
-            new_neighbours = list()
-            for r, c in neighbours:
-                new_neighbours += flood_fill(shape_mask, id_mask, r, c, target_value)
-            new_neighbours = list(set(new_neighbours))
-            if not new_neighbours:
-                break
-            neighbours = new_neighbours
-            if len(neighbours) > (shape_mask.shape[0] * shape_mask.shape[1]):
-                print('Something\'s gone terribly wrong - we have more neighbours than pixels!')
-                break
+        # -- flood fill the current island
+        utils.flood_fill(shape_mask, id_mask, row, column, target_value)
 
         target_value = np.asarray([random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)])
         if use_id_array:
@@ -165,45 +118,18 @@ def generate_image_id(input_image, use_id_array=False, id_array=None, boolean_cu
 
     # -- compose a LUT for the generated IDs
     id_lut = np.asarray([ids])
-    id_img = Image.fromarray(np.uint8(id_lut * 255))
 
-    return Image.fromarray(np.uint8(id_mask * 255)), id_img
+    return id_mask, id_lut
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def generate_sdf_data(input_data, id_data=None, spread=25, normalize_distance=True):
-    """
-    Generate raw SDF Data as a numpy array.
+def get_id_islands(img_id, id_lut):
+    pass
 
-    :param input_data: input data, boolean field (0/1 float ndarray)
-    :type input_data: numpy.ndarray
 
-    :param id_data: input ID, which allows us to spit out an SDF'd image ID which can then be used for animation.
-    :type id_data: numpy.ndarray
-
-    :param spread: the number of pixels to "spread" the distance field.
-    :type spread: int
-
-    :param normalize_distance: if True, will calculate the distance field and _then_ normalize the output.
-    :type normalize_distance: bool
-
-    :return: numpy array
-    :rtype: numpy.ndarray
-    """
-    # -- this method returns a C "MemoryView" array, which numpy can understand and convert
-    result, id_map = calculate_sdf(
-        bool_field=input_data,
-        id_map=id_data,
-        radius=spread,
-        normalize_distance=normalize_distance,
-    )
-    
-    # -- convert to numpy ndarray
-    result = np.asarray(result)
-    id_map = np.asarray(id_map)
-
-    # -- return the result
-    return result, id_map
+# ----------------------------------------------------------------------------------------------------------------------
+def generate_sdf_color_id(img_id, sdf, coord_map):
+    pass
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -246,22 +172,20 @@ def generate_sdf(input_image, boolean_cutoff=0.5, spread=25, normalize_distance=
     :param normalize_distance: if True, will calculate the distance field and _then_ normalize the output.
     :type normalize_distance: bool
 
-    :return: the generated data as an image with 4 channels
-    :rtype: PIL.Image
+    :return: (SDF, coord map)
+    :rtype: tuple
     """
-    # -- filter the input image, converting it to greyscale and ensuring we have floating point values to work with.
-    data = np.asarray(input_image.convert('L')).astype(np.float64) / 255.0
+    data = utils.img_to_bool_field(input_image, bool_cutoff=boolean_cutoff)
 
-    # -- convert image to boolean field; the algorithm requires absolutes in order to work properly
-    data[data > boolean_cutoff] = 1.0
-    data[data <= boolean_cutoff] = 0.0
-    
-    # -- generate an image ID and LUT
-    id_data, lut = generate_image_id(input_image, boolean_cutoff=boolean_cutoff)
-    id_data = np.asarray(id_data, dtype=int)
+    # -- this method returns a C "MemoryView" array, which numpy can understand and convert
+    sdf, coord_map = calculate_sdf(
+        bool_field=data,
+        radius=spread,
+        normalize_distance=normalize_distance,
+    )
 
-    # -- generate the result data
-    result, id_map = generate_sdf_data(data, id_data, spread, normalize_distance)
+    # -- convert to numpy ndarray
+    sdf = np.asarray(sdf)
+    coord_map = np.asarray(coord_map)
 
-    # -- return a composed image
-    return Image.fromarray(np.uint8(result * 255)), Image.fromarray(np.uint8(id_map)), lut
+    return sdf, coord_map

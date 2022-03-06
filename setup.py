@@ -4,7 +4,7 @@ from Cython.Build import cythonize
 ext_modules = [
     Extension(
         "sdf_erosion",
-        ["sdf_erosion.pyx"],
+        ["sdf_generator.pyx"],
         # -- this argument is necessary to support open multi threading
         extra_compile_args=['-openmp'],
     )
