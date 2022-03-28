@@ -28,8 +28,89 @@ from sdf_generator import calculate_sdf, get_boundaries
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def generate_progression_gradient(sdf, id_map, coord_map):
+def generate_progression_gradient(sdf, sdf_id, id_lut):
     pass
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def generate_id_progression_gradient(sdf, sdf_id, color_id, coord_map):
+    """
+    Generate a progression gradient for a single ID color. This will return a greyscale image with a gradient that
+    progresses along the SDF, tangential to its direction, which is stored in the red and green channels.
+    The direction is always clockwise. The starting point will attempt to be chosen as middle top.
+    """
+    # -- find all coordinates where the RGB value is equal to the given color ID
+    coord_pairs = np.asarray(np.where((sdf_id == color_id).all(axis=-1)[..., None]))
+
+    coords = list()
+
+    for i in range(len(coord_pairs[0])):
+        column, row = coord_pairs[0][i], coord_pairs[1][i]
+        coords.append([column, row])
+
+    result = np.zeros((sdf.shape[0], sdf.shape[1], 2), dtype=np.float64)
+
+    # -- todo: find top-middle pixel at SDF channel 4 value 0.5 (roughly)
+    current_coord = random.choice(coords)
+
+    current_value = 1.0
+
+    origin = utils.get_origin_for_coord(coord_map, current_coord)
+
+    mask = coord_map[:, :, :2] == origin
+    result[mask] = current_value
+
+    debug_trace = np.zeros((sdf.shape[0], sdf.shape[1], 3), dtype=np.float64)
+    debug_trace[current_coord[0], current_coord[1]] = 1.0
+
+    previous_direction = None
+
+    while True:
+        # -- perpendicular clockwise vector in 2D is reversed axes, with the x-axis mirrored.
+        direction = np.asarray(
+            [
+                sdf[current_coord[0], current_coord[1], 1],
+                -sdf[current_coord[0], current_coord[1], 0]
+            ]
+        )
+
+        direction += [-0.5, 0.5]
+        direction *= 2.0
+
+        next_coord = utils.get_closest_neighbour_in_direction(
+            coord_map,
+            current_coord,
+            direction
+        )
+
+        if next_coord is None:
+            break
+
+        if sdf[next_coord[0], next_coord[1], 2] == 0.0:
+            continue
+
+        if (current_coord == next_coord).all():
+            raise ValueError('Next coord cannot be the same as current coord!')
+
+        current_coord = next_coord
+        current_value += 1.0
+
+        previous_direction = direction
+
+        origin = utils.get_origin_for_coord(coord_map, current_coord)
+        mask = coord_map[:, :, :2] == origin
+
+        result[mask] = current_value
+        debug_trace[current_coord[0], current_coord[1]] = 1.0
+
+        print(current_value)
+
+        if current_value > 500.0:
+            break
+
+    utils.np_arr_to_img(debug_trace).show()
+
+    return result, current_value
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -129,9 +210,8 @@ def get_id_islands(img_id, id_lut):
 
     # -- we only need to iterate over the LUT's first row, as we know it's a 1-row image.
     for column in range(id_lut.shape[1]):
-        result.append(
-            np.where(img_id == id_lut[0][column])
-        )
+        where = np.where((img_id == id_lut[0][column]).all(axis=-1)[..., None])
+        result.append(where)
 
     return np.asarray(result)
 

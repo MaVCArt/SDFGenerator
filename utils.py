@@ -133,3 +133,49 @@ def flood_fill_single_pixel(shape_mask, id_mask, row, column, target_color):
 # ----------------------------------------------------------------------------------------------------------------------
 def np_arr_to_img(arr):
     return Image.fromarray(np.uint8(arr * 255))
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def get_closest_neighbour_in_direction(arr, coord, direction):
+    # -- to trick the round() function, we multiply the direction by 2.
+    # -- this way, all numbers below 0.5 will round down to 0, all numbers above will round up to 1
+    pixel_direction = direction.astype(np.float64)
+
+    if pixel_direction[0] > 0:
+        pixel_direction[0] = 1
+
+    if pixel_direction[0] < 0:
+        pixel_direction[0] = -1
+
+    if pixel_direction[1] > 0:
+        pixel_direction[1] = 1
+
+    if pixel_direction[1] < 0:
+        pixel_direction[1] = -1
+
+    if pixel_direction[0] == 0.0 and pixel_direction[1] == 0.0:
+        return None
+
+    if pixel_direction[0] < 0 and coord[0] == 0:
+        return None
+
+    if pixel_direction[0] > 0 and coord[0] == arr.shape[0] - 1:
+        return None
+
+    if pixel_direction[1] < 0 and coord[1] == 0:
+        return None
+
+    if pixel_direction[1] > 0 and coord[1] == arr.shape[1] - 1:
+        return None
+
+    new_coord = coord + pixel_direction.astype(int)
+    return new_coord
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def get_origin_for_coord(coord_map, coord):
+    try:
+        return coord_map[coord[0], coord[1]][:2]
+    except IndexError:
+        print('Failed to fetch origin for coord %s' % coord)
+        raise IndexError
