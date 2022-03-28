@@ -92,7 +92,7 @@ cpdef tuple calculate_sdf(
     # -- boundary pixel. This information can then be used to generate further images, such as an ID map, or others.
     # -- we pre-fill this with a value of -1 so we can recognize pixels outside the chosen spread.
     cdef int[:, :, :] coord_map = np.full(
-        (bool_field.shape[0], bool_field.shape[1], 2),
+        (bool_field.shape[0], bool_field.shape[1], 3),
         -1,
         dtype=int
     )

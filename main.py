@@ -24,7 +24,7 @@ SOFTWARE.
 import random
 import numpy as np
 from . import utils
-from sdf_erosion import calculate_sdf
+from sdf_generator import calculate_sdf, get_boundaries
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -68,6 +68,7 @@ def generate_image_id(input_image, use_id_array=False, id_array=None, boolean_cu
     remaining_pixels = shape_mask[shape_mask == 1.0]
 
     target_value = np.asarray([random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)])
+
     target_value_index = 0
     if use_id_array:
         target_value = id_array[target_value_index]
@@ -124,12 +125,38 @@ def generate_image_id(input_image, use_id_array=False, id_array=None, boolean_cu
 
 # ----------------------------------------------------------------------------------------------------------------------
 def get_id_islands(img_id, id_lut):
-    pass
+    result = list()
+
+    # -- we only need to iterate over the LUT's first row, as we know it's a 1-row image.
+    for column in range(id_lut.shape[1]):
+        result.append(
+            np.where(img_id == id_lut[0][column])
+        )
+
+    return np.asarray(result)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def generate_sdf_color_id(img_id, sdf, coord_map):
-    pass
+def calculate_sdf_color_id(img_id, coord_map, sdf):
+    result = np.zeros((sdf.shape[0], sdf.shape[1], 3), dtype=np.int)
+
+    for row in range(img_id.shape[0]):
+        for column in range(img_id.shape[1]):
+            # -- no need to do anything if there is no SDF information here.
+            if sdf[column, row, 2] == 0:
+                continue
+
+            a, b = coord_map[column, row][:2]
+            result[column, row] = img_id[a, b]
+
+    return result
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def calculate_boundaries(input_image, boolean_cutoff=0.5):
+    data = utils.img_to_bool_field(input_image, bool_cutoff=boolean_cutoff)
+    data = get_boundaries(data)
+    return np.asarray(data)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
