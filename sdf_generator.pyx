@@ -58,7 +58,9 @@ cpdef object get_boundaries(object data):
 @cython.nonecheck(False)
 cpdef tuple calculate_sdf(
         object bool_field,
+        object id_map,
         int radius=25,
+        int mode=2, # -- 0: external | 1: internal | 2: dual
         bint normalize_distance=True,
 ):
     cdef int width = bool_field.shape[0]
@@ -67,19 +69,22 @@ cpdef tuple calculate_sdf(
     # -- get boundary field, this gives us the pixels we want to erode.
     cdef object boundary_field = get_boundaries(bool_field).astype(float)
 
+    if id_map.shape[:2] != bool_field.shape:
+        raise ValueError('id map shape must match bool field shape: %s / %s' % (id_map.shape[:2], bool_field.shape))
+
     # -- get all pixels to erode
     cdef double[:, :] bool_field_arr = bool_field.astype(float)
 
     # -- get all boundary coords
     cdef int[:, :] coords = np.asarray(np.where(boundary_field == 1.0)).T.astype(int)
 
-    # -- declare a three dimensional array, distance in the alpha channel, direction in
+    # -- declare a three-dimensional array, distance in the alpha channel, direction in
     # -- red and green, black/white bit mask in blue, denoting pixels that were touched
     # -- and pixels that were not
 
     # -- this output data, when converted to a numpy array, can be directly converted to an
     # -- RGBA image, with distance info in the alpha channel for maximum bit depth.
-    # -- this is declared as a 3D double, because it creates a cython memoryslice,
+    # -- this is declared as a 3D double, because it creates a cython memory slice,
     # -- which acts as a pre-allocated array in memory, such that we can operate on it
     # -- from multiple threads at once.
     cdef double[:, :, :] result = np.full(
@@ -88,14 +93,11 @@ cpdef tuple calculate_sdf(
         dtype=DTYPE
     )
 
-    # -- the second output is a coordinate map; for each pixel in the SDF, it stores the coordinate of its paired
-    # -- boundary pixel. This information can then be used to generate further images, such as an ID map, or others.
-    # -- we pre-fill this with a value of -1 so we can recognize pixels outside the chosen spread.
-    cdef int[:, :, :] coord_map = np.full(
-        (bool_field.shape[0], bool_field.shape[1], 3),
-        -1,
-        dtype=int
-    )
+    # -- copy id map to an easily accessible array which can be accessed from a thread
+    cdef int[:, :, :] id_map_result = id_map.astype(int)
+
+    # -- copy id map to an easily accessible array which can be accessed from a thread
+    cdef int[:, :, :] id_map_original = id_map.astype(int)
 
     # -- float converts to double implicitly in C
     cdef double max_size = <float> radius
@@ -109,16 +111,8 @@ cpdef tuple calculate_sdf(
     cdef int coord_range = len(coords)
 
     # -- allocating iterator variables
-    cdef int i, x, y, column, row, c, r
+    cdef int i, x, y, column, row
     cdef int min_x, max_x, min_y, max_y = 0
-
-    # -- pre-fill coord map with the boolean field pixels as they refer to themselves
-    for c in prange(width, nogil=True, schedule='static'):
-        for r in range(height):
-            if not bool_field_arr[c, r]:
-                continue
-            coord_map[c, r, 0] = c
-            coord_map[c, r, 1] = r
 
     # -- this is what makes this so fast; the "prange" method means it runs in parallel on as many threads
     # -- as cython can use.
@@ -166,16 +160,16 @@ cpdef tuple calculate_sdf(
                 # -- track which ID we matched as closest
                 # -- we assign individual channels because otherwise we engage the GIL or python, which slows
                 # -- things down A LOT
-                coord_map[x, y, 0] = column
-                coord_map[x, y, 1] = row
+                id_map_result[x, y, 0] = id_map_original[column, row, 0]
+                id_map_result[x, y, 1] = id_map_original[column, row, 1]
+                id_map_result[x, y, 2] = id_map_original[column, row, 2]
 
     # -- bucket values for min/max remapping of the alpha channel
     # -- these are safe, as we know values do not exceed the 0-1 range at this stage
     cdef float min_value = 10.0
     cdef float max_value = -10.0
 
-    # -- remap alpha channel so we have one long smooth gradient from 0 to 1 from inside
-    # -- to outside.
+    # -- remap alpha channel so that we have one long smooth gradient from 0 to 1 from inside to outside.
     for x in range(width):
         for y in range(height):
             # -- early out for untouched pixels
@@ -183,15 +177,26 @@ cpdef tuple calculate_sdf(
             if result[x, y][3] != result[x, y][3]:
                 continue
 
-            result[x, y][0] = result[x, y][0] * 0.5 + 0.5
-            result[x, y][1] = result[x, y][1] * 0.5 + 0.5
+            if mode == 0:
+                if bool_field_arr[x, y] == 1.0:
+                    result[x, y][3] = 0.0
+                    result[x, y][4] = 0.0
 
-            # -- remap based on bool field if necessary
-            if bool_field_arr[x, y] > 0.0:
-                result[x, y][3] = 1.0 + (1.0 - result[x, y][3])
+            if mode == 1:
+                if bool_field_arr[x, y] == 0.0:
+                    result[x, y][3] = 0.0
+                    result[x, y][4] = 0.0
 
-            # -- divide by 2 in every case
-            result[x, y][3] /= 2.0
+            if mode == 2:
+                result[x, y][0] = result[x, y][0] * 0.5 + 0.5
+                result[x, y][1] = result[x, y][1] * 0.5 + 0.5
+
+                # -- remap based on bool field if necessary
+                if bool_field_arr[x, y] == 1.0:
+                    result[x, y][3] = 1.0 + (1.0 - result[x, y][3])
+
+                # -- divide by 2 in every case
+                result[x, y][3] /= 2.0
 
             # -- protect nan comparison; this returns True if that value is NaN
             if result[x, y][3] != result[x, y][3]:
@@ -205,7 +210,7 @@ cpdef tuple calculate_sdf(
 
     # -- if the user does not want to normalize the distance field, return here.
     if not normalize_distance:
-        return result, coord_map
+        return result, id_map_result
 
     if max_value == min_value:
         raise ZeroDivisionError('if max and min are identical, this results in a zero division!')
@@ -219,4 +224,4 @@ cpdef tuple calculate_sdf(
         for y in range(height):
             result[x, y][3] = (result[x, y][3] - min_value) / (max_value - min_value)
 
-    return result, coord_map
+    return result, id_map_result

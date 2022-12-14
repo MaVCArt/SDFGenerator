@@ -1,96 +1,28 @@
 import numpy as np
-from PIL import Image
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def img_to_bool_field(img, bool_cutoff=0.5):
+def flood_fill_pixel_square(shape_mask, id_mask, row, column, target_color):
     """
-    Convert a PIL Image instance to a bit mask with only black or white values.
+    Takes a single pixel, and sets its color, as well as its neighbours', to the given target color.
+    This behaviour is masked by the shape mask, which makes this act like a flood fill when called recursively.
 
-    :param img: Black / White input image (must be a PIL Image)
-    :type img: PIL.Image
+    :param shape_mask: numpy array containing an image that serves as our mask for the flood fill to be bound by.
+    :type shape_mask: np.Array
 
-    :param bool_cutoff: cutoff value for the input image pre-process.
-    :type bool_cutoff: float
+    :param id_mask: current ID mask intermediate result
+    :type id_mask: np.Array
 
-    :return: numpy array as a boolean field (float type)
-    :rtype: np.array
-    """
-    # -- filter the input image, converting it to greyscale and ensuring we have floating point values to work with.
-    data = np.asarray(img.convert('L')).astype(np.float64) / 255.0
-
-    # -- convert image to boolean field; the algorithm requires absolutes in order to work properly
-    data[data > bool_cutoff] = 1.0
-    data[data <= bool_cutoff] = 0.0
-
-    return data
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-def flood_fill(shape_mask, id_mask, row, column, target_color):
-    """
-    Flood fill the given id mask starting at the given row and column.
-
-    :param shape_mask: boolean shape mask setting boundaries for all flood fill islands.
-    :type shape_mask: np.array
-
-    :param id_mask: base id mask array, will be manipulated directly.
-    :type id_mask: np.array
-
-    :param row: the row to start the flood fill from
+    :param row: the row index to flood fill
     :type row: int
 
-    :param column: the column to start the flood fill from
+    :param column: the column index to flood fill.
     :type column: int
 
-    :param target_color: the color to fill with
-    :type target_color: np.array
+    :param target_color: the color (a numpy array) to flood fill the center pixel with.
+    :type target_color: np.Array
 
-    :return: None
-    """
-    neighbours = flood_fill_single_pixel(shape_mask, id_mask, row, column, target_color)
-
-    while True:
-        new_neighbours = list()
-        for r, c in neighbours:
-            new_neighbours += flood_fill_single_pixel(shape_mask, id_mask, r, c, target_color)
-
-        new_neighbours = list(set(new_neighbours))
-        if not new_neighbours:
-            break
-
-        neighbours = new_neighbours
-        if len(neighbours) > (shape_mask.shape[0] * shape_mask.shape[1]):
-            print('Something\'s gone terribly wrong - we have more neighbours than pixels!')
-            break
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-def flood_fill_single_pixel(shape_mask, id_mask, row, column, target_color):
-    """
-    Flood fill method that performs a flood fill on the ID mask starting from the row, column, and fills from there
-    using the ID mask as a boundary. This will essentially flood fill the ID mask from the starting pixel using the
-    "target-color" argument, bound by the shape mask, assuming the shape mask is a bit mask (black or white).
-
-    This method only fills one pixel and its immediate neighbours, and returns any remaining neighbours that remain
-    in need of filling.
-
-    :param shape_mask: boolean shape mask setting boundaries for all flood fill islands.
-    :type shape_mask: np.array
-
-    :param id_mask: base id mask array, will be manipulated directly.
-    :type id_mask: np.array
-
-    :param row: the row to start the flood fill from
-    :type row: int
-
-    :param column: the column to start the flood fill from
-    :type column: int
-
-    :param target_color: the color to fill with
-    :type target_color: np.array
-
-    :return: list of remaining neighbours that have not been flood filled.
+    :return: list of neighbours we can use for a subsequent recursive loop
     :rtype: list
     """
     shape_mask[row, column] = 0.0
@@ -110,18 +42,17 @@ def flood_fill_single_pixel(shape_mask, id_mask, row, column, target_color):
     neighbours = list()
 
     for _row, _column in offsets:
+        # -- clip behaviour to the bounds of the mask shape
         if _row < 0:
             continue
-
         if _row >= shape_mask.shape[0]:
             continue
-
         if _column < 0:
             continue
-
         if _column >= shape_mask.shape[1]:
             continue
 
+        # -- if the neighbouring pixel is masked, do not fill it. This limits the behaviour to the mask boundaries.
         if shape_mask[_row, _column] == 0.0:
             continue
 
@@ -131,51 +62,53 @@ def flood_fill_single_pixel(shape_mask, id_mask, row, column, target_color):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def np_arr_to_img(arr):
-    return Image.fromarray(np.uint8(arr * 255))
+def color_mask(array, color):
+    """
+    array : m x n x 3 array of colors
+    *_lim are 2-element tuples, where the first element is expected to be <= the second.
+    """
+    r_mask = np.asarray(array[..., 0] == color[0])
+    g_mask = np.asarray(array[..., 1] == color[1])
+    b_mask = np.asarray(array[..., 2] == color[2])
+    return r_mask & g_mask & b_mask
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def get_closest_neighbour_in_direction(arr, coord, direction):
-    # -- to trick the round() function, we multiply the direction by 2.
-    # -- this way, all numbers below 0.5 will round down to 0, all numbers above will round up to 1
-    pixel_direction = direction.astype(np.float64)
+def find_image_islands(image_id, lut):
+    """
+    From a given image, return its islands as distinct numpy arrays that can serve as masks for that island only.
+    This aids in finding islands below a certain size, which can help in reducing the noise in a given bitmap.
 
-    if pixel_direction[0] > 0:
-        pixel_direction[0] = 1
+    :param image_id: RGB input image (must be a PIL Image), image ID
+    :type image_id: PIL.Image
 
-    if pixel_direction[0] < 0:
-        pixel_direction[0] = -1
+    :param lut: RGB input image (must be a PIL Image), LUT
+    :type lut: PIL.Image
 
-    if pixel_direction[1] > 0:
-        pixel_direction[1] = 1
+    :return: List of np.Array instances that contain a mask texture for each of their islands.
+    :rtype: list
+    """
+    masks = list()
 
-    if pixel_direction[1] < 0:
-        pixel_direction[1] = -1
+    image_id = np.array(image_id).astype(np.float64)
+    lut = np.asarray(lut).astype(np.float64)
 
-    if pixel_direction[0] == 0.0 and pixel_direction[1] == 0.0:
-        return None
+    # -- for each color in the LUT, we generate a black and white mask for that color and return it
+    for column in range(lut.shape[1]):
+        # -- get our mask
+        color = lut[0, column]
 
-    if pixel_direction[0] < 0 and coord[0] == 0:
-        return None
+        # -- ignore black pixels
+        if color[0] == 0 and color[1] == 0 and color[2] == 0:
+            continue
 
-    if pixel_direction[0] > 0 and coord[0] == arr.shape[0] - 1:
-        return None
+        mask = color_mask(image_id, color)
 
-    if pixel_direction[1] < 0 and coord[1] == 0:
-        return None
+        # -- now that we have our mask, generate an array from it
+        masked = np.zeros([image_id.shape[0], image_id.shape[1]], dtype=int)
+        masked[mask] = 1.0
 
-    if pixel_direction[1] > 0 and coord[1] == arr.shape[1] - 1:
-        return None
+        # -- and return it
+        masks.append(masked)
 
-    new_coord = coord + pixel_direction.astype(int)
-    return new_coord
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-def get_origin_for_coord(coord_map, coord):
-    try:
-        return coord_map[coord[0], coord[1]][:2]
-    except IndexError:
-        print('Failed to fetch origin for coord %s' % coord)
-        raise IndexError
+    return masks
