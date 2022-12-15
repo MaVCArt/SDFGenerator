@@ -23,11 +23,10 @@ SOFTWARE.
 """
 import random
 import numpy as np
-from sdf_generator import calculate_sdf, get_boundaries
 from PIL import Image
 
-from .sdf_erosion import calculate_sdf
-from .utils import flood_fill_pixel_square, find_image_islands, color_mask
+from .sdf_generator import calculate_sdf
+from .utils import flood_fill_pixel_square, find_image_islands
 
 
 # ----------------------------------------------------------------------------------------------------------------------
