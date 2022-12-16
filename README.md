@@ -1,29 +1,3 @@
-# SDF Generator
-
-Simple SDF Generator using Python and Cython / numpy
-
-Note: you will have to compile your own .pyd file if you wish to use this module. 
-Setup.py is supplied, and this cython should compile on python 2.7.8 and 3.5.0, on which it was tested.
-
-If you wish to use it for another version,
-you will have to compile it using setup.py for your own python version. Please consult the official Cython website
-on how to do this.
-
-This uses Cython to accelerate the SDF Calculation, and outputs three PIL Images:
-
-The first, an RGBA image:
-
-- red / green channel: directional field indicating the UV space direction of the distance field
-- blue channel: bit mask indicating as white all pixels that were altered in the output data
-- alpha channel: traditional SDF (optionally normalized)
-
-The second, an RGB image, with a generated color ID for the SDF, where each island in the original image
-is assigned a random color. This information is then used during the SDF calculation to assign newly calculated
-pixels the ID of the nearest white pixel they matched.
-
-The final, an RGB image, is a LUT of the color ID. Using these two images combined with the first, some very interesting
-shader effects can be achieved.
-
 # Requirements
 
 ```
@@ -32,73 +6,93 @@ shader effects can be achieved.
 - cython
 ```
 
+# SDF Generator
+
+Simple SDF Generator using Python and Cython / numpy
+
+Note: you will have to compile your own .pyd file if you wish to use this module. 
+Setup.py is supplied, and this cython should compile on python 2.7.8+.
+
+The code is currently mainly being tested on Python 3.10, so backwards compatibility is not guaranteed. However, the
+modules used are intentionally "vanilla" to maintain maximum compatibility with external use.
+
+This uses Cython to accelerate the SDF Calculation and is capable of generating various types of SDF and SDF-adjacent
+images.
 
 # Usage
 
-## Working with PIL Images
+## Simple SDF
 
-SDFGenerator can be given a PIL Image, and it will assume it is given a black / white image in the
-0 - 255 integer range, though it will perform a conversion internally anyway to be sure.
+The example below, taken from `run.py` under "example/simple_sdf", shows how to generate a simple SDF and extract
+the images you might want.
 
-The output of this function is another PIL image that can be saved out directly to retrieve your SDF.
+By default, the output image is generated using the following spec;
+
+- Red and Green Channels: directional SDF. Encodes not the distance, but the direction to the nearest mask pixel.
+- Blue Channel: Alpha. Encodes all pixels within the range of the mask pixels as pure black/white.
+- Alpha: Traditional SDF. This is encoded in the alpha to provide maximum bit range when imported into game engines.
 
 ```python
 import SDFGenerator
 from PIL import Image
 
 # -- black/white input image
-img = Image.open('example_assets/input.png')
-output = SDFGenerator.generate_sdf(img, boolean_cutoff=0.5, spread=100, normalize_distance=True)
-output.save('example_assets/output.png')
+img = Image.open('input.png')
+
+resize_output = (256, 256)
+
+output = SDFGenerator.generate_sdf(
+    img,
+    boolean_cutoff=0.5,
+    spread=50,
+    normalize_distance=False,
+)
+
+output.resize(resize_output).save('output.png')
+
+# -- save the output data as individual images to illustrate functionality
+output.getchannel('A').resize(resize_output).save('output_alpha.png')
+output.convert('RGB').resize(resize_output).save('output_rgb.png')
+output.getchannel('B').resize(resize_output).save('output_blue.png')
 ```
 
-## Working with numpy arrays
+## SDF With Image ID
 
-If you're working with big data, or you can't or don't want to use PIL for your own reasons, SDFGenerator
-can still be helpful to you, as under the hood it actually just operates on numpy arrays (in fact this
-is one of the reasons it's so fast). the `generate_sdf_data` function can be given a `numpy.ndarray` of
-type `float`, assuming this array contains only `1` and `0` as values. (Boolean arrays probably won't work.)
+The example below, taken from `run.py` under "example/sdf_with_image_id", shows how to generate a simple SDF, paired 
+with a color ID map and a LUT (Lookup Texture) containing all colours in the ID map.
 
-This function also does not convert, check or filter the input data, so beware when using this directly.
+The SDF texture is encoded using the same standard and spec as the previous example, however the Image ID and LUT bear
+some additional explanation.
+
+The Image ID is generated internally, based on a random Colour ID that gets assigned to each "island" in the mask
+texture provided. "Islands" here are defined as free-floating contiguous pixel "sections" that can be flood filled.
+
+This "colour ID" image provides the user with the ability to combine this with the LUT and SDF textures to achieve some
+otherwise hard-to-do effects in shaders.
 
 ```python
-import numpy as np
 import SDFGenerator
+from PIL import Image
 
-data = np.ndarray((512, 512), dtype=np.float64)
+# -- black/white input image
+img = Image.open('input.png')
 
-# -- insert some token data
-data[:255] = 1.0
-data[255:] = 0.0
+resize_output = (256, 256)
 
-# -- get our SDF
-output = SDFGenerator.generate_sdf_data(data, spread=25, normalize_distance=True)
+output, color_id, lut = SDFGenerator.generate_sdf_with_image_id(
+    img,
+    boolean_cutoff=0.5,
+    spread=50,
+    normalize_distance=True
+)
 
+color_id.resize(resize_output).save('output_id.png')
+lut.save('output_id_lut.png')
+
+output.resize(resize_output).save('output.png')
+
+# -- save the output data as individual images to illustrate functionality
+output.getchannel('A').resize(resize_output).save('output_alpha.png')
+output.convert('RGB').resize(resize_output).save('output_rgb.png')
+output.getchannel('B').resize(resize_output).save('output_blue.png')
 ```
-
-<table>
-<tr>
-    <td>Input data</td>
-    <td>Raw output data (RGBA)</td>
-    <td>Directional Data (RG)</td>
-    <td>Data bit mask (B)</td>
-    <td>Traditional SDF (Alpha)</td>
-</tr>
-<tr>
-	<td>
-		<img src="https://github.com/mavcart/sdfgenerator/blob/main/example_assets/input.png?raw=true" height="100"/>
-	</td>
-	<td>
-		<img src="https://github.com/mavcart/sdfgenerator/blob/main/example_assets/output.png?raw=true" height="100"/>
-	</td>
-    <td>
-		<img src="https://github.com/mavcart/sdfgenerator/blob/main/example_assets/output_rgb.png?raw=true" height="100"/>
-	</td>
-    <td>
-		<img src="https://github.com/mavcart/sdfgenerator/blob/main/example_assets/output_blue.png?raw=true" height="100"/>
-	</td>
-    <td>
-		<img src="https://github.com/mavcart/sdfgenerator/blob/main/example_assets/output_alpha.png?raw=true" height="100"/>
-	</td>
-</tr>
-</table>
