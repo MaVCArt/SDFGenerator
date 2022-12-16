@@ -1,3 +1,6 @@
+"""
+This is a collection of utilities designed to help with the various functions of the SDF Generator.
+"""
 import numpy as np
 
 
@@ -64,8 +67,10 @@ def flood_fill_pixel_square(shape_mask, id_mask, row, column, target_color):
 # ----------------------------------------------------------------------------------------------------------------------
 def color_mask(array, color):
     """
-    array : m x n x 3 array of colors
-    *_lim are 2-element tuples, where the first element is expected to be <= the second.
+    From a given array of tuples (3 elements), generate a black-white mask (booleans) for all elements in the input
+    array that matched all three elements of the given color.
+
+    This functions like a "color ID select".
     """
     r_mask = np.asarray(array[..., 0] == color[0])
     g_mask = np.asarray(array[..., 1] == color[1])

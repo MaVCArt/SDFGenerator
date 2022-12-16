@@ -1,6 +1,5 @@
 # cython: profile=True
 # cython: language=C++
-
 import cython
 import numpy as np
 from cython.parallel import prange
@@ -10,6 +9,9 @@ DTYPE = np.float64
 
 # ----------------------------------------------------------------------------------------------------------------------
 cpdef object shift(object arr, int num, object fill_value=np.nan):
+    """
+     
+    """
     result = np.empty_like(arr)
     if num > 0:
         result[:num] = fill_value
@@ -24,6 +26,9 @@ cpdef object shift(object arr, int num, object fill_value=np.nan):
 
 # ----------------------------------------------------------------------------------------------------------------------
 cpdef object get_row_boundaries(object row):
+    """
+
+    """
     rising_diff = row - shift(row, 1, fill_value=0)
     decreasing_diff = row - shift(row, -1, fill_value=0)
     return np.maximum(rising_diff, decreasing_diff)
@@ -35,6 +40,9 @@ cpdef object get_row_boundaries(object row):
 @cython.cdivision(True)
 @cython.nonecheck(False)
 cpdef object get_boundaries(object data):
+    """
+
+    """
     cdef object rows = data.copy().astype(float)
 
     # -- row boundaries
@@ -63,6 +71,9 @@ cpdef tuple calculate_sdf(
         int mode=2, # -- 0: external | 1: internal | 2: dual
         bint normalize_distance=True,
 ):
+    """
+
+    """
     cdef int width = bool_field.shape[0]
     cdef int height = bool_field.shape[1]
 
