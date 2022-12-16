@@ -61,7 +61,7 @@ output.convert('RGB').resize(resize_output).save('output_rgb.png')
 output.getchannel('B').resize(resize_output).save('output_blue.png')
 ```
 
-### Simple SDF Usafe Example
+### Simple SDF Usage Example
 
 <img src="https://github.com/MaVCArt/SDFGenerator/blob/main/example/demo/standard_sdf_demo.gif?raw=true" height="256"/>
 
@@ -106,6 +106,6 @@ output.convert('RGB').resize(resize_output).save('output_rgb.png')
 output.getchannel('B').resize(resize_output).save('output_blue.png')
 ```
 
-### Image ID SDF Usafe Example
+### Image ID SDF Usage Example
 
 <img src="https://github.com/MaVCArt/SDFGenerator/blob/main/example/demo/id_sdf_demo.gif?raw=true" height="256"/>
