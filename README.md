@@ -1,5 +1,7 @@
-<img src="https://github.com/MaVCArt/SDFGenerator/blob/main/example/demo/standard_sdf_demo.gif?raw=true" height="100"/>
-<img src="https://github.com/MaVCArt/SDFGenerator/blob/main/example/demo/id_sdf_demo.gif?raw=true" height="100"/>
+<div>
+    <img src="https://github.com/MaVCArt/SDFGenerator/blob/main/example/demo/standard_sdf_demo.gif?raw=true" height="256"/>
+    <img src="https://github.com/MaVCArt/SDFGenerator/blob/main/example/demo/id_sdf_demo.gif?raw=true" height="256"/>
+</div>
 
 # Requirements
 
@@ -61,7 +63,7 @@ output.getchannel('B').resize(resize_output).save('output_blue.png')
 
 ### Simple SDF Usafe Example
 
-<img src="https://github.com/MaVCArt/SDFGenerator/blob/main/example/demo/standard_sdf_demo.gif?raw=true" height="100"/>
+<img src="https://github.com/MaVCArt/SDFGenerator/blob/main/example/demo/standard_sdf_demo.gif?raw=true" height="256"/>
 
 ## SDF With Image ID
 
@@ -106,4 +108,4 @@ output.getchannel('B').resize(resize_output).save('output_blue.png')
 
 ### Image ID SDF Usafe Example
 
-<img src="https://github.com/MaVCArt/SDFGenerator/blob/main/example/demo/id_sdf_demo.gif?raw=true" height="100"/>
+<img src="https://github.com/MaVCArt/SDFGenerator/blob/main/example/demo/id_sdf_demo.gif?raw=true" height="256"/>
