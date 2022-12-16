@@ -1,3 +1,6 @@
+<img src="https://github.com/MaVCArt/SDFGenerator/blob/main/example/demo/standard_sdf_demo.gif?raw=true" height="100"/>
+<img src="https://github.com/MaVCArt/SDFGenerator/blob/main/example/demo/id_sdf_demo.gif?raw=true" height="100"/>
+
 # Requirements
 
 ```
@@ -56,6 +59,10 @@ output.convert('RGB').resize(resize_output).save('output_rgb.png')
 output.getchannel('B').resize(resize_output).save('output_blue.png')
 ```
 
+### Simple SDF Usafe Example
+
+<img src="https://github.com/MaVCArt/SDFGenerator/blob/main/example/demo/standard_sdf_demo.gif?raw=true" height="100"/>
+
 ## SDF With Image ID
 
 The example below, taken from `run.py` under "example/sdf_with_image_id", shows how to generate a simple SDF, paired 
@@ -96,3 +103,7 @@ output.getchannel('A').resize(resize_output).save('output_alpha.png')
 output.convert('RGB').resize(resize_output).save('output_rgb.png')
 output.getchannel('B').resize(resize_output).save('output_blue.png')
 ```
+
+### Image ID SDF Usafe Example
+
+<img src="https://github.com/MaVCArt/SDFGenerator/blob/main/example/demo/id_sdf_demo.gif?raw=true" height="100"/>
